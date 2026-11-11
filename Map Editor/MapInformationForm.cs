@@ -234,14 +234,7 @@ namespace Map_Editor
             if (libraryIndex == 199)
                 return "AniTiles1.lib";
 
-            var libraryPrefix = GetReferenceKindByIndex(libraryIndex) switch
-            {
-                MapReferenceKind.Objects => "Object",
-                MapReferenceKind.Tiles => "Tiles",
-                MapReferenceKind.SMTiles => "SMTiles",
-                _ => "Library"
-            };
-            return string.Format("{0}[{1}].Lib", libraryPrefix, libraryIndex);
+            return string.Format("Unmapped library slot #{0}", libraryIndex);
         }
 
         private static void AddReference(
