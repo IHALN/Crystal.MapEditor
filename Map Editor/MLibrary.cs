@@ -286,6 +286,87 @@ namespace Map_Editor
             Loaded = true;
         }
 
+        public static int LoadMir2Libraries(string directory)
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                throw new DirectoryNotFoundException("Select the Data\\Map folder or its WemadeMir2/ShandaMir2 subfolder.");
+
+            directory = Path.GetFullPath(directory);
+
+            if (!Directory.Exists(Path.Combine(directory, "WemadeMir2")) &&
+                !Directory.Exists(Path.Combine(directory, "ShandaMir2")))
+            {
+                var directoryName = Path.GetFileName(directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                if (string.Equals(directoryName, "WemadeMir2", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(directoryName, "ShandaMir2", StringComparison.OrdinalIgnoreCase))
+                {
+                    directory = Directory.GetParent(directory)?.FullName;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(directory) ||
+                (!Directory.Exists(Path.Combine(directory, "WemadeMir2")) &&
+                 !Directory.Exists(Path.Combine(directory, "ShandaMir2"))))
+            {
+                throw new DirectoryNotFoundException("The selected folder must contain a WemadeMir2 or ShandaMir2 folder.");
+            }
+
+            var libraries = new List<(int Index, string Directory, string Name)>();
+            void AddIfPresent(string libraryDirectory, int index, string name)
+            {
+                if (File.Exists(Path.Combine(libraryDirectory, name + ".lib")))
+                    libraries.Add((index, libraryDirectory, name));
+            }
+
+            var wemadeDirectory = Path.Combine(directory, "WemadeMir2");
+            if (Directory.Exists(wemadeDirectory))
+            {
+                AddIfPresent(wemadeDirectory, 0, "Tiles");
+                AddIfPresent(wemadeDirectory, 1, "Smtiles");
+                AddIfPresent(wemadeDirectory, 2, "Objects");
+                for (var suffix = 2; suffix <= 27; suffix++)
+                    AddIfPresent(wemadeDirectory, suffix + 1, "Objects" + suffix);
+                AddIfPresent(wemadeDirectory, 90, "Objects_32bit");
+            }
+
+            var shandaDirectory = Path.Combine(directory, "ShandaMir2");
+            if (Directory.Exists(shandaDirectory))
+            {
+                AddIfPresent(shandaDirectory, 100, "Tiles");
+                for (var suffix = 2; suffix <= 10; suffix++)
+                    AddIfPresent(shandaDirectory, 99 + suffix, "Tiles" + suffix);
+
+                AddIfPresent(shandaDirectory, 110, "SmTiles");
+                for (var suffix = 2; suffix <= 10; suffix++)
+                    AddIfPresent(shandaDirectory, 109 + suffix, "SmTiles" + suffix);
+
+                AddIfPresent(shandaDirectory, 120, "Objects");
+                for (var suffix = 2; suffix <= 79; suffix++)
+                    AddIfPresent(shandaDirectory, 119 + suffix, "Objects" + suffix);
+
+                AddIfPresent(shandaDirectory, 199, "AniTiles1");
+            }
+
+            if (libraries.Count == 0)
+                throw new InvalidDataException("No supported Mir2 map libraries were found in the selected folder.");
+
+            for (var index = 0; index <= 199; index++)
+            {
+                MapLibs[index]?.Close();
+                MapLibs[index] = new MLibrary("");
+                ListItems[index] = null;
+            }
+
+            foreach (var entry in libraries)
+            {
+                var libraryPath = Path.Combine(entry.Directory, entry.Name);
+                MapLibs[entry.Index] = new MLibrary(libraryPath);
+                ListItems[entry.Index] = new ListItem(entry.Name, entry.Index);
+            }
+
+            return libraries.Count;
+        }
+
     }
     public sealed class MLibrary
     {

@@ -137,17 +137,10 @@ namespace Map_Editor
                     return fileName;
             }
 
-            // The map stores the numeric library slot even when its library file
-            // is not loaded. Show the inferred slot name instead of hiding that ID.
-            var inferredKind = GetReferenceKindByIndex(libraryIndex);
-            var libraryPrefix = inferredKind switch
-            {
-                MapReferenceKind.Objects => "Object",
-                MapReferenceKind.Tiles => "Tiles",
-                MapReferenceKind.SMTiles => "SMTiles",
-                _ => "Library"
-            };
-            return string.Format("{0}[{1}].Lib (not loaded)", libraryPrefix, libraryIndex);
+            // Show the file associated with this map slot, not a filename made
+            // directly from the slot number. For example ShandaMir2 slot 154 is
+            // Objects35.lib (slot 120 is Objects.lib, slot 121 is Objects2.lib).
+            return GetInferredLibraryName(libraryIndex) + " (not loaded)";
         }
 
         public static string GetLibraryFile(short libraryIndex)
@@ -183,7 +176,7 @@ namespace Map_Editor
                 return MapReferenceKind.SMTiles;
             if (libraryName.Contains("tile"))
                 return MapReferenceKind.Tiles;
-            if (!libraryName.StartsWith("("))
+            if (!libraryName.StartsWith("(") && !libraryName.Contains("(not loaded)"))
                 return MapReferenceKind.Objects;
 
             return GetReferenceKindByIndex(libraryIndex);
@@ -209,6 +202,46 @@ namespace Map_Editor
             }
 
             return MapReferenceKind.Objects;
+        }
+
+        private static string GetInferredLibraryName(short libraryIndex)
+        {
+            if (libraryIndex == 0)
+                return "Tiles.lib";
+            if (libraryIndex == 1)
+                return "Smtiles.lib";
+            if (libraryIndex == 2)
+                return "Objects.lib";
+            if (libraryIndex >= 3 && libraryIndex <= 28)
+                return string.Format("Objects{0}.lib", libraryIndex - 1);
+            if (libraryIndex == 90)
+                return "Objects_32bit.lib";
+
+            if (libraryIndex == 100)
+                return "Tiles.lib";
+            if (libraryIndex >= 101 && libraryIndex <= 109)
+                return string.Format("Tiles{0}.lib", libraryIndex - 99);
+
+            if (libraryIndex == 110)
+                return "SmTiles.lib";
+            if (libraryIndex >= 111 && libraryIndex <= 119)
+                return string.Format("SmTiles{0}.lib", libraryIndex - 109);
+
+            if (libraryIndex == 120)
+                return "Objects.lib";
+            if (libraryIndex >= 121 && libraryIndex <= 198)
+                return string.Format("Objects{0}.lib", libraryIndex - 119);
+            if (libraryIndex == 199)
+                return "AniTiles1.lib";
+
+            var libraryPrefix = GetReferenceKindByIndex(libraryIndex) switch
+            {
+                MapReferenceKind.Objects => "Object",
+                MapReferenceKind.Tiles => "Tiles",
+                MapReferenceKind.SMTiles => "SMTiles",
+                _ => "Library"
+            };
+            return string.Format("{0}[{1}].Lib", libraryPrefix, libraryIndex);
         }
 
         private static void AddReference(
@@ -393,8 +426,11 @@ namespace Map_Editor
             var closeButton = new Button { AutoSize = true, Text = "Close", DialogResult = DialogResult.Cancel };
             var refreshButton = new Button { AutoSize = true, Text = "Refresh" };
             refreshButton.Click += (_, _) => RefreshView();
+            var loadLibrariesButton = new Button { AutoSize = true, Text = "Load Mir2 libraries..." };
+            loadLibrariesButton.Click += LoadMir2Libraries_Click;
             actions.Controls.Add(closeButton);
             actions.Controls.Add(refreshButton);
+            actions.Controls.Add(loadLibrariesButton);
 
             bottomPanel.Controls.Add(editGroup, 0, 0);
             bottomPanel.Controls.Add(actions, 0, 1);
@@ -406,6 +442,41 @@ namespace Map_Editor
             CancelButton = closeButton;
 
             RefreshView();
+        }
+
+        private void LoadMir2Libraries_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new FolderBrowserDialog())
+            {
+                dialog.Description = "Select the Data\\Map folder containing WemadeMir2 and/or ShandaMir2, or select either subfolder.";
+                dialog.ShowNewFolderButton = false;
+                if (Directory.Exists(Libraries.ShandaMir2LibPath))
+                    dialog.SelectedPath = Path.GetFullPath(Libraries.ShandaMir2LibPath);
+
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+
+                try
+                {
+                    var loaded = Libraries.LoadMir2Libraries(dialog.SelectedPath);
+                    RefreshView();
+                    MessageBox.Show(
+                        this,
+                        string.Format("Loaded {0:N0} Mir2 map libraries. Close this window to view the map with its objects. For ShandaMir2, map index 154 maps to Objects35.lib; index 35 is a WemadeMir2 slot.", loaded),
+                        "Map libraries loaded",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        this,
+                        ex.Message,
+                        "Could not load map libraries",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
         }
 
         private static DataGridView CreateReferencesGrid()
