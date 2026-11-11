@@ -118,8 +118,12 @@ namespace Map_Editor
 
         public static string GetLibraryName(short libraryIndex)
         {
-            if (libraryIndex < 0 || libraryIndex >= Libraries.ListItems.Length)
+            if (libraryIndex < 0 ||
+                libraryIndex >= Libraries.ListItems.Length ||
+                libraryIndex >= Libraries.MapLibs.Length)
+            {
                 return "(invalid index)";
+            }
 
             var listItem = Libraries.ListItems[libraryIndex];
             if (listItem != null && !string.IsNullOrWhiteSpace(listItem.Text))
@@ -133,7 +137,17 @@ namespace Map_Editor
                     return fileName;
             }
 
-            return "(not loaded)";
+            // The map stores the numeric library slot even when its library file
+            // is not loaded. Show the inferred slot name instead of hiding that ID.
+            var inferredKind = GetReferenceKindByIndex(libraryIndex);
+            var libraryPrefix = inferredKind switch
+            {
+                MapReferenceKind.Objects => "Object",
+                MapReferenceKind.Tiles => "Tiles",
+                MapReferenceKind.SMTiles => "SMTiles",
+                _ => "Library"
+            };
+            return string.Format("{0}[{1}].Lib (not loaded)", libraryPrefix, libraryIndex);
         }
 
         public static string GetLibraryFile(short libraryIndex)
@@ -171,6 +185,14 @@ namespace Map_Editor
                 return MapReferenceKind.Tiles;
             if (!libraryName.StartsWith("("))
                 return MapReferenceKind.Objects;
+
+            return GetReferenceKindByIndex(libraryIndex);
+        }
+
+        private static MapReferenceKind GetReferenceKindByIndex(short libraryIndex)
+        {
+            if (libraryIndex < 0 || libraryIndex >= Libraries.MapLibs.Length)
+                return MapReferenceKind.Unknown;
 
             if (libraryIndex == 1 || (libraryIndex >= 110 && libraryIndex <= 119))
                 return MapReferenceKind.SMTiles;
